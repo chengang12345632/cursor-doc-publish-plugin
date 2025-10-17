@@ -14,6 +14,7 @@ export async function publishDirectory(uri?: vscode.Uri): Promise<void> {
   try {
     Logger.clear();
     Logger.info('========== 开始批量发布目录 ==========');
+    Logger.show(); // 自动显示输出面板
 
     // 1. 获取目录路径
     let directoryPath: string;
@@ -21,8 +22,10 @@ export async function publishDirectory(uri?: vscode.Uri): Promise<void> {
     if (uri) {
       // 从右键菜单调用
       directoryPath = uri.fsPath;
+      Logger.info(`触发方式: 右键菜单`);
     } else {
       // 从命令面板调用，让用户选择目录
+      Logger.info(`触发方式: 命令面板`);
       const selected = await vscode.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
@@ -31,6 +34,7 @@ export async function publishDirectory(uri?: vscode.Uri): Promise<void> {
       });
 
       if (!selected || selected.length === 0) {
+        Logger.info('用户取消了目录选择');
         return;
       }
 
@@ -42,14 +46,27 @@ export async function publishDirectory(uri?: vscode.Uri): Promise<void> {
     // 2. 读取配置
     const config = await ConfigService.getConfig();
     if (!config) {
-      vscode.window.showErrorMessage('未找到配置，请先在设置中配置插件');
+      const msg = '未找到配置，请先在设置中配置插件';
+      Logger.error(msg);
+      Logger.error('请按 Ctrl+Shift+P，搜索 "Preferences: Open Settings"，然后搜索 "docPublish" 进行配置');
+      vscode.window.showErrorMessage(msg, '打开设置').then(action => {
+        if (action === '打开设置') {
+          vscode.commands.executeCommand('workbench.action.openSettings', 'docPublish');
+        }
+      });
       return;
     }
 
     // 验证配置
     const errors = ConfigService.validateConfig(config);
     if (errors.length > 0) {
-      vscode.window.showErrorMessage(`配置不完整: ${errors.join(', ')}`);
+      const msg = `配置不完整: ${errors.join(', ')}`;
+      Logger.error(msg);
+      vscode.window.showErrorMessage(msg, '打开设置').then(action => {
+        if (action === '打开设置') {
+          vscode.commands.executeCommand('workbench.action.openSettings', 'docPublish');
+        }
+      });
       return;
     }
 

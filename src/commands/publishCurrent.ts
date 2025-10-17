@@ -14,6 +14,7 @@ export async function publishCurrent(uri?: vscode.Uri): Promise<void> {
   try {
     Logger.clear();
     Logger.info('========== 开始发布当前文档 ==========');
+    Logger.show(); // 自动显示输出面板，方便用户查看日志
 
     // 1. 获取当前文档路径
     let markdownPath: string;
@@ -21,11 +22,15 @@ export async function publishCurrent(uri?: vscode.Uri): Promise<void> {
     if (uri) {
       // 从右键菜单调用
       markdownPath = uri.fsPath;
+      Logger.info(`触发方式: 右键菜单`);
     } else {
       // 从命令面板或快捷键调用
+      Logger.info(`触发方式: 命令面板/快捷键`);
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
-        vscode.window.showErrorMessage('请先打开一个 Markdown 文档');
+        const msg = '请先打开一个 Markdown 文档';
+        Logger.error(msg);
+        vscode.window.showErrorMessage(msg);
         return;
       }
       markdownPath = editor.document.uri.fsPath;
@@ -33,7 +38,9 @@ export async function publishCurrent(uri?: vscode.Uri): Promise<void> {
 
     // 验证是否为 Markdown 文件
     if (!markdownPath.endsWith('.md')) {
-      vscode.window.showErrorMessage('当前文件不是 Markdown 文档');
+      const msg = '当前文件不是 Markdown 文档';
+      Logger.error(msg);
+      vscode.window.showErrorMessage(msg);
       return;
     }
 
@@ -42,7 +49,14 @@ export async function publishCurrent(uri?: vscode.Uri): Promise<void> {
     // 2. 读取配置
     const config = await ConfigService.getConfig();
     if (!config) {
-      vscode.window.showErrorMessage('未找到配置，请先在设置中配置插件');
+      const msg = '未找到配置，请先在设置中配置插件';
+      Logger.error(msg);
+      Logger.error('请按 Ctrl+Shift+P，搜索 "Preferences: Open Settings"，然后搜索 "docPublish" 进行配置');
+      vscode.window.showErrorMessage(msg, '打开设置').then(action => {
+        if (action === '打开设置') {
+          vscode.commands.executeCommand('workbench.action.openSettings', 'docPublish');
+        }
+      });
       return;
     }
 
