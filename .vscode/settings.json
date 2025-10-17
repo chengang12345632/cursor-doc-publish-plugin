@@ -1,0 +1,9 @@
+{
+    "docPublish.nextcloud.basePath": "/test",
+    "docPublish.nextcloud.password": "SoWFk-B6aRG-mwPQe-NNcb5-qfTSG",
+    "docPublish.nextcloud.url": "https://docs.streamax.com:18001/",
+    "docPublish.nextcloud.username": "chengang",
+    "docPublish.nextcloud.webdavUsername": "chengang_3074",
+    "docPublish.project.serviceName": "chengang",
+    "docPublish.project.version": "2.16.13"
+}
