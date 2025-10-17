@@ -1,0 +1,143 @@
+{
+  "name": "cursor-doc-publish-plugin",
+  "displayName": "NextCloud Doc Publisher",
+  "description": "一键发布 Markdown 文档到 NextCloud，自动上传资源文件，支持单文档和批量发布",
+  "version": "1.2.2",
+  "publisher": "shon-chen",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "nextcloud",
+    "documentation",
+    "markdown",
+    "publish",
+    "webdav"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chengang-97/cursor-doc-publish-plugin.git"
+  },
+  "license": "Apache-2.0",
+  "icon": "icon.png",
+  "activationEvents": [
+    "onCommand:docPublish.publishCurrent",
+    "onCommand:docPublish.publishDirectory",
+    "onCommand:docPublish.testConnection",
+    "onCommand:docPublish.showConfiguration"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "docPublish.publishCurrent",
+        "title": "Publish Current Doc to NextCloud"
+      },
+      {
+        "command": "docPublish.publishDirectory",
+        "title": "Publish Doc Directory to NextCloud"
+      },
+      {
+        "command": "docPublish.testConnection",
+        "title": "NextCloud Doc Publisher: Test Connection"
+      },
+      {
+        "command": "docPublish.showConfiguration",
+        "title": "NextCloud Doc Publisher: Show Configuration"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "docPublish.publishCurrent",
+        "key": "ctrl+shift+u",
+        "mac": "cmd+shift+u",
+        "when": "editorTextFocus && resourceExtname == .md"
+      },
+      {
+        "command": "docPublish.publishDirectory",
+        "key": "ctrl+alt+shift+u",
+        "mac": "cmd+option+shift+u"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "docPublish.publishCurrent",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        },
+        {
+          "command": "docPublish.publishDirectory",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "NextCloud Doc Publisher",
+      "properties": {
+        "docPublish.nextcloud.url": {
+          "type": "string",
+          "description": "NextCloud服务器地址",
+          "default": ""
+        },
+        "docPublish.nextcloud.username": {
+          "type": "string",
+          "description": "NextCloud用户名",
+          "default": ""
+        },
+        "docPublish.nextcloud.password": {
+          "type": "string",
+          "description": "NextCloud密码或应用专用密码",
+          "default": ""
+        },
+        "docPublish.nextcloud.basePath": {
+          "type": "string",
+          "description": "NextCloud存储根路径（必填，必须是已存在的目录，如 /云平台开发部/平台研发/业务中台组）"
+        },
+        "docPublish.nextcloud.webdavUsername": {
+          "type": "string",
+          "description": "WebDAV文件空间用户名（可选，如果与登录用户名不同，如 chengang_3074）",
+          "default": ""
+        },
+        "docPublish.project.serviceName": {
+          "type": "string",
+          "description": "项目标识（可以是服务名、项目名或其它标识）",
+          "default": ""
+        },
+        "docPublish.project.version": {
+          "type": "string",
+          "description": "项目版本号（可选，用于文档版本管理）",
+          "default": ""
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "build": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^16.18.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.0",
+    "@typescript-eslint/parser": "^5.59.0",
+    "@vscode/test-electron": "^2.3.0",
+    "eslint": "^8.40.0",
+    "typescript": "^5.0.4"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "webdav": "^5.2.0"
+  }
+}
+
