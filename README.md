@@ -1,6 +1,6 @@
 # 文档发布插件 (Cursor Plugin)
 
-[![Open VSX Registry](https://img.shields.io/open-vsx/v/chengang12345632/cursor-doc-publish-plugin?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/chengang12345632/cursor-doc-publish-plugin)
+[![Open VSX Registry](https://img.shields.io/open-vsx/v/shon-chen/cursor-doc-publish-plugin?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/shon-chen/cursor-doc-publish-plugin)
 [![GitHub](https://img.shields.io/github/license/chengang12345632/cursor-doc-publish-plugin?style=flat-square)](https://github.com/chengang12345632/cursor-doc-publish-plugin/blob/main/LICENSE)
 
 Cursor/VSCode 插件，用于在编辑器中一键发布项目文档到 NextCloud。
@@ -194,12 +194,12 @@ flowchart TD
 **方式二：从命令行安装**
 
 ```bash
-cursor --install-extension chengang12345632.cursor-doc-publish-plugin
+cursor --install-extension shon-chen.cursor-doc-publish-plugin
 ```
 
 **方式三：访问 OpenVSX**
 
-👉 [OpenVSX Registry](https://open-vsx.org/extension/chengang12345632/cursor-doc-publish-plugin)
+👉 [OpenVSX Registry](https://open-vsx.org/extension/shon-chen/cursor-doc-publish-plugin)
 
 ### 第2步：配置
 
