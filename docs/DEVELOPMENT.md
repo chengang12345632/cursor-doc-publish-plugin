@@ -13,7 +13,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/chengang-97/cursor-doc-publish-plugin.git
+git clone https://github.com/chengang12345632/cursor-doc-publish-plugin.git
 cd cursor-doc-publish-plugin
 
 # 安装依赖

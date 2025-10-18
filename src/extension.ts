@@ -89,7 +89,7 @@ async function showWelcomeMessage(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('workbench.action.openSettings', 'docPublish');
       } else if (action === '查看文档') {
         vscode.env.openExternal(
-          vscode.Uri.parse('https://github.com/chengang-97/cursor-doc-publish-plugin#readme')
+          vscode.Uri.parse('https://github.com/chengang12345632/cursor-doc-publish-plugin#readme')
         );
       }
     }
