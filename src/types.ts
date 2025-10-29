@@ -6,18 +6,11 @@ export interface NextCloudConfig {
   url: string;
   username: string;
   password: string;
-  basePath: string;
-  webdavUsername?: string; // 可选：WebDAV 文件空间用户名（如果与 username 不同）
-}
-
-export interface ProjectConfig {
-  serviceName: string; // 可以为空字符串，表示不创建此层级目录
-  version?: string; // 可选：项目版本号，用于文档版本管理
+  webdavUsername: string; // 必填：WebDAV 文件空间用户名
 }
 
 export interface DocPublishConfig {
   nextcloud: NextCloudConfig;
-  project: ProjectConfig;
 }
 
 export interface AssetInfo {

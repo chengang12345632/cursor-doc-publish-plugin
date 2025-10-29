@@ -12,17 +12,15 @@ export class NextCloudService {
   private webdavClient: WebDAVClient;
   private httpClient: AxiosInstance;
   private config: NextCloudConfig;
-  private basePath: string;
 
   constructor(config: NextCloudConfig) {
     this.config = config;
-    this.basePath = config.basePath;
     
     // 标准化 URL，移除末尾的斜杠
     const baseUrl = config.url.endsWith('/') ? config.url.slice(0, -1) : config.url;
     
-    // WebDAV 文件空间用户名（如果配置了 webdavUsername 则使用它，否则使用 username）
-    const webdavUser = config.webdavUsername || config.username;
+    // WebDAV 文件空间用户名
+    const webdavUser = config.webdavUsername;
     
     // 初始化 WebDAV 客户端
     const webdavUrl = `${baseUrl}/remote.php/dav/files/${webdavUser}`;
@@ -57,7 +55,7 @@ export class NextCloudService {
       
       // 显示标准化后的 URL
       const baseUrl = this.config.url.endsWith('/') ? this.config.url.slice(0, -1) : this.config.url;
-      const webdavUser = this.config.webdavUsername || this.config.username;
+      const webdavUser = this.config.webdavUsername;
       const webdavUrl = `${baseUrl}/remote.php/dav/files/${webdavUser}`;
       
       Logger.info(`配置的 URL: ${this.config.url}`);
@@ -66,10 +64,7 @@ export class NextCloudService {
       }
       Logger.info(`实际 WebDAV URL: ${webdavUrl}`);
       Logger.info(`认证用户名: ${this.config.username}`);
-      if (this.config.webdavUsername) {
-        Logger.info(`文件空间用户名: ${this.config.webdavUsername}`);
-      }
-      Logger.info(`Base Path: ${this.basePath}`);
+      Logger.info(`文件空间用户名: ${this.config.webdavUsername}`);
       
       const exists = await this.webdavClient.exists('/');
       if (exists) {
@@ -91,59 +86,6 @@ export class NextCloudService {
           Logger.error('无法列出根目录内容', listError as Error);
         }
         
-        Logger.info('');
-        Logger.info('正在检查 basePath 是否存在...');
-        
-        const basePathExists = await this.webdavClient.exists(this.basePath);
-        if (basePathExists) {
-          Logger.success(`✓ Base Path 存在: ${this.basePath}`);
-        } else {
-          Logger.error(`✗ Base Path 不存在: ${this.basePath}`);
-          Logger.error(``);
-          Logger.error(`📋 诊断结果：`);
-          Logger.error(`  - WebDAV 连接成功`);
-          Logger.error(`  - 但个人空间是空的（0 个文件/文件夹）`);
-          Logger.error(``);
-          Logger.error(`🤔 可能的原因：`);
-          Logger.error(`  1. 您的 NextCloud 个人空间从未使用过（全新账户）`);
-          Logger.error(`  2. 您在网页版看到的文件在"群组文件夹"或"共享空间"`);
-          Logger.error(`  3. NextCloud 配置了特殊的文件空间结构`);
-          Logger.error(``);
-          Logger.error(`💡 解决方案：`);
-          Logger.error(`  方案 1：在 NextCloud 网页版的个人空间根目录创建 "${this.basePath.replace('/', '')}" 文件夹`);
-          Logger.error(`         登录 → 左侧"文件（Files）" → 确保在根目录 → 新建文件夹`);
-          Logger.error(``);
-          Logger.error(`  方案 2：如果您的文件在群组文件夹中，修改 basePath 配置：`);
-          Logger.error(`         例如：/云平台开发部/平台研发/业务中台组`);
-          Logger.error(``);
-          Logger.error(`  方案 3：尝试使用插件创建测试目录（下一步）`);
-        }
-        
-        // 提供创建目录的选项
-        if (!basePathExists && contents.length === 0) {
-          Logger.info(``);
-          Logger.info(`📝 尝试创建测试目录...`);
-          
-          try {
-            // 尝试创建 basePath
-            await this.webdavClient.createDirectory(this.basePath);
-            Logger.success(`✓ 成功创建目录: ${this.basePath}`);
-            Logger.info(``);
-            Logger.info(`🎉 好消息！`);
-            Logger.info(`   - 目录创建成功`);
-            Logger.info(`   - 现在请刷新 NextCloud 网页版，看看 "${this.basePath.replace('/', '')}" 文件夹是否出现`);
-            Logger.info(`   - 如果出现了，说明配置正确，可以开始使用插件了`);
-            Logger.info(`   - 如果没出现，说明 WebDAV 空间和网页版不是同一个空间`);
-          } catch (createError: any) {
-            Logger.error(`✗ 创建目录失败: ${this.basePath}`);
-            Logger.error(`   错误: ${createError.message || String(createError)}`);
-            Logger.error(``);
-            Logger.error(`📌 建议：`);
-            Logger.error(`   1. 检查您的 NextCloud 账户是否有创建目录的权限`);
-            Logger.error(`   2. 或者，在网页版手动创建目录后再试`);
-            Logger.error(`   3. 如果您的文件在群组文件夹，修改 basePath 配置指向群组文件夹`);
-          }
-        }
         
         return true;
       }
@@ -162,47 +104,29 @@ export class NextCloudService {
 
   /**
    * 创建目录（递归）
-   * 注意：basePath 必须预先存在，插件只创建 basePath 下的子目录
    */
   public async createDirectory(dirPath: string): Promise<boolean> {
     try {
       // 标准化路径
       const normalizedPath = dirPath.replace(/\\/g, '/');
-      const normalizedBasePath = this.basePath.replace(/\\/g, '/');
       
       // 根目录不需要创建
       if (normalizedPath === '/' || normalizedPath === '') {
         return true;
       }
 
-      // 如果是 basePath 本身，验证其是否存在而不尝试创建
-      if (normalizedPath === normalizedBasePath) {
-        const exists = await this.webdavClient.exists(normalizedPath);
-        if (!exists) {
-          Logger.error(`Base Path 不存在，请在 NextCloud 中手动创建: ${normalizedPath}`);
-          Logger.error(`提示：登录 NextCloud → 文件 → 新建文件夹 → 创建 "${normalizedBasePath}"`);
-          return false;
-        }
-        Logger.debug(`Base Path 已存在: ${normalizedPath}`);
-        return true;
-      }
-
-      // 如果路径不在 basePath 下，拒绝创建
-      if (!normalizedPath.startsWith(normalizedBasePath + '/')) {
-        Logger.error(`路径不在 basePath 范围内，拒绝创建: ${normalizedPath}`);
-        Logger.error(`basePath: ${normalizedBasePath}`);
-        return false;
-      }
+      // 确保路径以 / 开头
+      const fullPath = normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
 
       // 检查目录是否已存在
-      const exists = await this.webdavClient.exists(normalizedPath);
+      const exists = await this.webdavClient.exists(fullPath);
       if (exists) {
-        Logger.debug(`目录已存在: ${normalizedPath}`);
+        Logger.debug(`目录已存在: ${fullPath}`);
         return true;
       }
 
       // 递归创建父目录
-      const parentDir = path.dirname(normalizedPath).replace(/\\/g, '/');
+      const parentDir = path.dirname(fullPath).replace(/\\/g, '/');
       if (parentDir && parentDir !== '/' && parentDir !== '.') {
         const parentCreated = await this.createDirectory(parentDir);
         if (!parentCreated) {
@@ -213,28 +137,27 @@ export class NextCloudService {
 
       // 创建当前目录
       try {
-        await this.webdavClient.createDirectory(normalizedPath);
-        Logger.info(`创建目录成功: ${normalizedPath}`);
+        await this.webdavClient.createDirectory(fullPath);
+        Logger.info(`创建目录成功: ${fullPath}`);
         return true;
       } catch (createError: any) {
         // 再次检查是否已存在（可能在创建过程中被其他进程创建）
-        const existsNow = await this.webdavClient.exists(normalizedPath);
+        const existsNow = await this.webdavClient.exists(fullPath);
         if (existsNow) {
-          Logger.debug(`目录在创建过程中已被创建: ${normalizedPath}`);
+          Logger.debug(`目录在创建过程中已被创建: ${fullPath}`);
           return true;
         }
         
         // 记录详细错误信息
         const errorMsg = createError?.message || String(createError);
         const statusCode = createError?.response?.status;
-        Logger.error(`创建目录失败: ${normalizedPath} (状态码: ${statusCode}, 错误: ${errorMsg})`);
+        Logger.error(`创建目录失败: ${fullPath} (状态码: ${statusCode}, 错误: ${errorMsg})`);
         
         // 403 错误提示可能是权限或密码问题
         if (statusCode === 403) {
           Logger.error(`提示：403 错误通常是因为：`);
           Logger.error(`  1. 使用了登录密码而不是应用专用密码`);
           Logger.error(`  2. 用户没有在该目录的写入权限`);
-          Logger.error(`  3. basePath 不存在（请先手动创建）`);
         }
         
         throw createError;

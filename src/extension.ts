@@ -19,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
   const publishCurrentCommand = vscode.commands.registerCommand(
     'docPublish.publishCurrent',
     async (uri?: vscode.Uri) => {
-      await publishCurrent(uri);
+      await publishCurrent(uri, context);
     }
   );
 
@@ -27,7 +27,7 @@ export function activate(context: vscode.ExtensionContext) {
   const publishDirectoryCommand = vscode.commands.registerCommand(
     'docPublish.publishDirectory',
     async (uri?: vscode.Uri) => {
-      await publishDirectory(uri);
+      await publishDirectory(uri, context);
     }
   );
 

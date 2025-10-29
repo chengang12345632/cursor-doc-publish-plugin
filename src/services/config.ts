@@ -70,34 +70,20 @@ export class ConfigService {
     const nextcloudUrl = config.get<string>('nextcloud.url');
     const nextcloudUsername = config.get<string>('nextcloud.username');
     const nextcloudPassword = config.get<string>('nextcloud.password');
-    const nextcloudBasePath = config.get<string>('nextcloud.basePath');
-    const nextcloudWebdavUsername = config.get<string>('nextcloud.webdavUsername'); // 可选
-    const serviceName = config.get<string>('project.serviceName') || ''; // serviceName 可以为空
-    const version = config.get<string>('project.version') || ''; // version 可以为空
+    const nextcloudWebdavUsername = config.get<string>('nextcloud.webdavUsername'); // 必填
 
-    // 验证必填项（serviceName 和 version 现在都是可选的）
+    // 验证必填项
     if (!nextcloudUrl || !nextcloudUsername || !nextcloudPassword || 
-        !nextcloudBasePath) {
+        !nextcloudWebdavUsername) {
       return null;
     }
 
-    const nextcloudConfig: any = {
-      url: nextcloudUrl,
-      username: nextcloudUsername,
-      password: nextcloudPassword,
-      basePath: nextcloudBasePath
-    };
-
-    // 如果配置了 webdavUsername，则添加
-    if (nextcloudWebdavUsername) {
-      nextcloudConfig.webdavUsername = nextcloudWebdavUsername;
-    }
-
     return {
-      nextcloud: nextcloudConfig,
-      project: {
-        serviceName,
-        version
+      nextcloud: {
+        url: nextcloudUrl,
+        username: nextcloudUsername,
+        password: nextcloudPassword,
+        webdavUsername: nextcloudWebdavUsername
       }
     };
   }
@@ -119,11 +105,7 @@ export class ConfigService {
         url: resolveString(config.nextcloud.url),
         username: resolveString(config.nextcloud.username),
         password: resolveString(config.nextcloud.password),
-        basePath: resolveString(config.nextcloud.basePath)
-      },
-      project: {
-        serviceName: resolveString(config.project.serviceName),
-        version: config.project.version ? resolveString(config.project.version) : undefined
+        webdavUsername: resolveString(config.nextcloud.webdavUsername)
       }
     };
   }
@@ -148,44 +130,13 @@ export class ConfigService {
     if (!config.nextcloud.password) {
       errors.push('NextCloud 密码未配置');
     }
-    if (!config.nextcloud.basePath) {
-      errors.push('NextCloud Base Path 未配置');
+    if (!config.nextcloud.webdavUsername) {
+      errors.push('WebDAV 文件空间用户名未配置');
     }
-    // serviceName 现在是可选的，不再验证
 
     return errors;
   }
 
-  /**
-   * 获取文档存储基础路径（只返回 basePath，serviceName 在后续路径中插入）
-   */
-  public static getDocStoragePath(config: DocPublishConfig): string {
-    return config.nextcloud.basePath;
-  }
-
-  /**
-   * 获取完整的文档存储路径（包含 version、目录名和 serviceName）
-   * @param config 配置信息
-   * @param dirName 目录名（文档所在目录或选择的目录）
-   * @returns 完整路径：
-   *   - 有 version: basePath/version/[serviceName]/
-   *   - 无 version: basePath/dirName/[serviceName]/
-   */
-  public static getFullDocPath(config: DocPublishConfig, dirName: string): string {
-    const basePath = config.nextcloud.basePath;
-    const serviceName = config.project.serviceName;
-    const version = config.project.version;
-    
-    // 如果配置了 version，使用 version 代替 dirName
-    const middlePath = (version && version.trim() !== '') ? version : dirName;
-    
-    if (!serviceName || serviceName.trim() === '') {
-      // 如果 serviceName 为空：basePath/middlePath/
-      return `${basePath}/${middlePath}`;
-    }
-    // 如果 serviceName 不为空：basePath/middlePath/serviceName/
-    return `${basePath}/${middlePath}/${serviceName}`;
-  }
 
   /**
    * 显示配置信息
@@ -207,15 +158,11 @@ export class ConfigService {
       `- URL: ${config.nextcloud.url}`,
       `- Username: ${config.nextcloud.username}`,
       `- Password: ${'*'.repeat(config.nextcloud.password.length)}`,
-      `- Base Path: ${config.nextcloud.basePath}`,
+      `- WebDAV 文件空间用户名: ${config.nextcloud.webdavUsername}`,
       '',
-      '**项目配置:**',
-      `- Service Name: ${config.project.serviceName || '(未配置)'}`,
-      `- Version: ${config.project.version || '(未配置)'}`,
-      '',
-      '**存储路径:**',
-      `- Base: ${this.getDocStoragePath(config)}`,
-      `- 目录结构: ${config.project.version ? `{basePath}/{version}/{serviceName}/` : `{basePath}/{dirName}/{serviceName}/`}`,
+      '**说明:**',
+      '- 上传目录在发布时动态选择',
+      '- 支持输入新目录或选择历史记录',
       ''
     ];
 

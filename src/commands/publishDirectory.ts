@@ -6,11 +6,15 @@ import { NextCloudService } from '../services/nextcloud';
 import { MarkdownService } from '../services/markdown';
 import { BatchPublishResult, PublishResult, DocPublishConfig, AssetInfo } from '../types';
 import { Logger } from '../utils/logger';
+import { showDirectorySelector } from '../utils/directorySelector';
 
 /**
  * 批量发布目录命令
  */
-export async function publishDirectory(uri?: vscode.Uri): Promise<void> {
+export async function publishDirectory(
+  uri?: vscode.Uri,
+  context?: vscode.ExtensionContext
+): Promise<void> {
   try {
     Logger.clear();
     Logger.info('========== 开始批量发布目录 ==========');
@@ -70,7 +74,25 @@ export async function publishDirectory(uri?: vscode.Uri): Promise<void> {
       return;
     }
 
-    // 3. 获取工作区根路径
+    // 3. 获取上传目录
+    if (!context) {
+      vscode.window.showErrorMessage('插件上下文未提供，无法选择上传目录');
+      return;
+    }
+
+    const uploadDirectory = await showDirectorySelector(
+      context,
+      '输入或选择上传目录（例如：/Docs/V2.16.13/design）'
+    );
+
+    if (!uploadDirectory) {
+      Logger.info('用户取消了目录选择');
+      return;
+    }
+
+    Logger.info(`选择的上传目录: ${uploadDirectory}`);
+
+    // 4. 获取工作区根路径
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
       vscode.window.showErrorMessage('请先打开一个工作区');
@@ -78,7 +100,7 @@ export async function publishDirectory(uri?: vscode.Uri): Promise<void> {
     }
     const workspaceRoot = workspaceFolders[0].uri.fsPath;
 
-    // 4. 执行批量发布
+    // 5. 执行批量发布
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -89,6 +111,7 @@ export async function publishDirectory(uri?: vscode.Uri): Promise<void> {
         return await publishDirectoryDocuments(
           directoryPath,
           workspaceRoot,
+          uploadDirectory,
           config,
           progress
         );
@@ -145,6 +168,7 @@ export async function publishDirectory(uri?: vscode.Uri): Promise<void> {
 async function publishDirectoryDocuments(
   directoryPath: string,
   workspaceRoot: string,
+  uploadDirectory: string,
   config: DocPublishConfig,
   progress: vscode.Progress<{ message?: string; increment?: number }>
 ): Promise<BatchPublishResult> {
@@ -171,9 +195,10 @@ async function publishDirectoryDocuments(
     const nextCloudService = new NextCloudService(config.nextcloud);
     Logger.publishing('初始化 NextCloud 客户端');
 
-    // 3. 获取选择的目录名称（最后一级）
-    const selectedDirName = path.basename(directoryPath);
-    Logger.info(`选择的目录名: ${selectedDirName}`);
+    // 3. 标准化上传目录
+    const normalizedDir = uploadDirectory.trim().replace(/\/$/, ''); // 去除末尾斜杠
+    const baseDir = normalizedDir.startsWith('/') ? normalizedDir : `/${normalizedDir}`;
+    Logger.info(`上传目录: ${baseDir}`);
 
     // 4. 收集所有文档引用的资源文件
     progress.report({ message: '收集文档引用的资源...' });
@@ -199,12 +224,9 @@ async function publishDirectoryDocuments(
       progress.report({ message: `批量上传资源... (0/${allAssets.length})` });
       Logger.publishing(`准备批量上传 ${allAssets.length} 个引用的资源文件`);
 
-      // 设置 NextCloud 路径: basePath/目录名/[serviceName]/assets/文件名
-      const fullPath = ConfigService.getFullDocPath(config, selectedDirName);
-
       allAssets.forEach(asset => {
-        // 构建远程路径: basePath/目录名/[serviceName]/assets/文件名
-        const remotePath = `${fullPath}/${asset.relativePath}`.replace(/\\/g, '/');
+        // 构建远程路径: {uploadDirectory}/assets/文件名
+        const remotePath = `${baseDir}/assets/${asset.fileName}`.replace(/\\/g, '/');
         asset.nextCloudPath = remotePath;
       });
 
@@ -242,8 +264,7 @@ async function publishDirectoryDocuments(
       const result = await processMarkdownFile(
         markdownPath,
         directoryPath,
-        selectedDirName,
-        config,
+        baseDir,
         nextCloudService,
         linkMap
       );
@@ -261,8 +282,7 @@ async function publishDirectoryDocuments(
 
     // 7. 获取文档目录的分享链接
     if (successCount > 0) {
-      const folderPath = ConfigService.getFullDocPath(config, selectedDirName).replace(/\\/g, '/');
-      await nextCloudService.getFolderShareLink(folderPath);
+      await nextCloudService.getFolderShareLink(baseDir);
     }
 
     return {
@@ -290,18 +310,16 @@ async function publishDirectoryDocuments(
 async function processMarkdownFile(
   markdownPath: string,
   directoryPath: string,
-  selectedDirName: string,
-  config: DocPublishConfig,
+  baseDir: string,
   nextCloudService: NextCloudService,
   linkMap: Map<string, string>
 ): Promise<PublishResult> {
   try {
     // 获取文件相对于选择目录的路径
-    const relativeToDir = path.relative(directoryPath, markdownPath);
+    const relativeToDir = path.relative(directoryPath, markdownPath).replace(/\\/g, '/');
     
-    // 设置远程路径: basePath/目录名/[serviceName]/相对路径
-    const fullPath = ConfigService.getFullDocPath(config, selectedDirName);
-    const remotePath = `${fullPath}/${relativeToDir}`.replace(/\\/g, '/');
+    // 设置远程路径: {uploadDirectory}/相对路径
+    const remotePath = `${baseDir}/${relativeToDir}`.replace(/\\/g, '/');
 
     // 直接上传原始文档（默认覆盖）
     const uploadSuccess = await nextCloudService.uploadFile(markdownPath, remotePath, true);

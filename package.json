@@ -2,7 +2,7 @@
   "name": "cursor-doc-publish-plugin",
   "displayName": "NextCloud Doc Publisher",
   "description": "一键发布 Markdown 文档到 NextCloud，自动上传资源文件，支持单文档和批量发布",
-  "version": "1.2.6",
+  "version": "2.0.0",
   "publisher": "shon-chen",
   "engines": {
     "vscode": "^1.80.0"
@@ -91,24 +91,9 @@
           "description": "NextCloud密码或应用专用密码",
           "default": ""
         },
-        "docPublish.nextcloud.basePath": {
-          "type": "string",
-          "description": "NextCloud存储根路径（必填，必须是已存在的目录，如 /云平台开发部/平台研发/业务中台组）"
-        },
         "docPublish.nextcloud.webdavUsername": {
           "type": "string",
-          "description": "WebDAV文件空间用户名（可选，如果与登录用户名不同，如 chengang_3074）",
-          "default": ""
-        },
-        "docPublish.project.serviceName": {
-          "type": "string",
-          "description": "项目标识（可以是服务名、项目名或其它标识）",
-          "default": ""
-        },
-        "docPublish.project.version": {
-          "type": "string",
-          "description": "项目版本号（可选，用于文档版本管理）",
-          "default": ""
+          "description": "WebDAV文件空间用户名（必填，如 chengang_3074）"
         }
       }
     }
