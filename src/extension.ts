@@ -3,6 +3,7 @@ import { Logger } from './utils/logger';
 import { ConfigService } from './services/config';
 import { publishCurrent } from './commands/publishCurrent';
 import { publishDirectory } from './commands/publishDirectory';
+import { downloadFromNextcloud } from './commands/downloadFromNextcloud';
 import { testConnection } from './commands/testConnection';
 
 /**
@@ -31,6 +32,14 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // 注册命令：从 NextCloud 下载到本地
+  const downloadFromNextcloudCommand = vscode.commands.registerCommand(
+    'docPublish.downloadFromNextcloud',
+    async (uri?: vscode.Uri) => {
+      await downloadFromNextcloud(uri, context);
+    }
+  );
+
   // 注册命令：测试连接
   const testConnectionCommand = vscode.commands.registerCommand(
     'docPublish.testConnection',
@@ -51,6 +60,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     publishCurrentCommand,
     publishDirectoryCommand,
+    downloadFromNextcloudCommand,
     testConnectionCommand,
     showConfigCommand
   );

@@ -7,6 +7,7 @@ import { MarkdownService } from '../services/markdown';
 import { BatchPublishResult, PublishResult, DocPublishConfig, AssetInfo } from '../types';
 import { Logger } from '../utils/logger';
 import { showDirectorySelector } from '../utils/directorySelector';
+import { getRemotePathSuggestion } from '../utils/pathHelper';
 
 /**
  * 批量发布目录命令
@@ -74,15 +75,26 @@ export async function publishDirectory(
       return;
     }
 
-    // 3. 获取上传目录
+    // 3. 获取工作区根路径
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      vscode.window.showErrorMessage('请先打开一个工作区');
+      return;
+    }
+    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+    // 4. 获取上传目录
     if (!context) {
       vscode.window.showErrorMessage('插件上下文未提供，无法选择上传目录');
       return;
     }
 
+    const defaultRemoteDir = getRemotePathSuggestion(workspaceRoot, directoryPath);
+
     const uploadDirectory = await showDirectorySelector(
       context,
-      '输入或选择上传目录（例如：/Docs/V2.16.13/design）'
+      '输入或选择上传目录（例如：/Docs/V2.16.13/design）',
+      defaultRemoteDir
     );
 
     if (!uploadDirectory) {
@@ -91,14 +103,6 @@ export async function publishDirectory(
     }
 
     Logger.info(`选择的上传目录: ${uploadDirectory}`);
-
-    // 4. 获取工作区根路径
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-      vscode.window.showErrorMessage('请先打开一个工作区');
-      return;
-    }
-    const workspaceRoot = workspaceFolders[0].uri.fsPath;
 
     // 5. 执行批量发布
     const result = await vscode.window.withProgress(

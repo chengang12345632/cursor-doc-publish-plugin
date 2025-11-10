@@ -25,6 +25,7 @@ export interface PublishResult {
   success: boolean;
   message: string;
   docUrl?: string;
+  directoryUrl?: string;
   assetsUploaded?: number;
   linksReplaced?: number;
   errors?: string[];

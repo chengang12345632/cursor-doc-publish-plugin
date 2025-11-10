@@ -19,8 +19,8 @@ export class MarkdownService {
       const markdownDir = path.dirname(markdownPath);
       const notFoundAssets = new Set<string>(); // 记录不存在的资源，避免重复警告
 
-      // 匹配所有资源引用: [xxx](assets/yyy) 和 ![xxx](assets/yyy)
-      const assetPattern = /!?\[([^\]]*)\]\((assets\/[^)]+)\)/g;
+      // 匹配所有资源引用: [xxx](assets/yyy)、![xxx](assets/yyy)、![xxx](./assets/yyy) 等
+      const assetPattern = /!?\[([^\]]*)\]\(((?:\.\.?\/)*assets\/[^)]+)\)/g;
       let match;
 
       while ((match = assetPattern.exec(content)) !== null) {

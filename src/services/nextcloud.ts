@@ -102,6 +102,21 @@ export class NextCloudService {
     }
   }
 
+  private normalizeRemotePath(remotePath: string): string {
+    if (!remotePath) {
+      return '/';
+    }
+
+    const trimmed = remotePath.trim().replace(/\\/g, '/');
+    if (!trimmed || trimmed === '/') {
+      return '/';
+    }
+
+    const withoutTrailing = trimmed.replace(/\/+$/, '');
+    const withLeading = withoutTrailing.startsWith('/') ? withoutTrailing : `/${withoutTrailing}`;
+    return withLeading || '/';
+  }
+
   /**
    * 创建目录（递归）
    */
@@ -278,6 +293,137 @@ export class NextCloudService {
       
       Logger.error(`创建分享链接失败: ${filePath}`, error as Error);
       return null;
+    }
+  }
+
+  /**
+   * 获取或创建分享链接（优先复用已存在的链接）
+   */
+  public async getOrCreateShareLink(filePath: string): Promise<string | null> {
+    const existing = await this.getExistingShareLink(filePath);
+    if (existing) {
+      Logger.info(`复用已存在的分享链接: ${filePath} -> ${existing}`);
+      return existing;
+    }
+    return await this.createShareLink(filePath);
+  }
+
+  /**
+   * 下载单个文件到本地
+   */
+  public async downloadFile(
+    remotePath: string,
+    localPath: string,
+    overwriteExisting: boolean = true
+  ): Promise<boolean> {
+    try {
+      const normalizedRemotePath = this.normalizeRemotePath(remotePath);
+      const remoteExists = await this.webdavClient.exists(normalizedRemotePath);
+
+      if (!remoteExists) {
+        Logger.error(`远程文件不存在: ${normalizedRemotePath}`);
+        return false;
+      }
+
+      if (!overwriteExisting && fs.existsSync(localPath)) {
+        Logger.info(`本地文件已存在且未开启覆盖，跳过下载: ${localPath}`);
+        return false;
+      }
+
+      const rawData = await this.webdavClient.getFileContents(normalizedRemotePath, {
+        format: 'binary'
+      });
+
+      const fileBuffer = Buffer.isBuffer(rawData)
+        ? rawData
+        : Buffer.from(rawData as ArrayBuffer);
+
+      fs.mkdirSync(path.dirname(localPath), { recursive: true });
+      fs.writeFileSync(localPath, fileBuffer);
+
+      Logger.info(`下载文件成功: ${normalizedRemotePath} -> ${localPath}`);
+      return true;
+    } catch (error) {
+      Logger.error(`下载文件失败: ${remotePath}`, error as Error);
+      return false;
+    }
+  }
+
+  /**
+   * 下载远程目录到本地
+   */
+  public async downloadDirectory(
+    remoteDir: string,
+    localDir: string,
+    overwriteExisting: boolean = true,
+    onProgress?: (current: number, total: number, fileName: string) => void
+  ): Promise<{ success: boolean; downloaded: number; total: number; errors: string[] }> {
+    try {
+      const normalizedRemoteDir = this.normalizeRemotePath(remoteDir);
+      const targetRemoteDir = normalizedRemoteDir === '' ? '/' : normalizedRemoteDir;
+
+      const remoteExists = await this.webdavClient.exists(targetRemoteDir || '/');
+      if (!remoteExists) {
+        const message = `远程目录不存在: ${targetRemoteDir}`;
+        Logger.error(message);
+        return { success: false, downloaded: 0, total: 0, errors: [message] };
+      }
+
+      const contents = await this.webdavClient.getDirectoryContents(targetRemoteDir || '/', {
+        deep: true
+      }) as Array<{ type: string; filename: string; basename: string }>;
+
+      const files = contents.filter(item => item.type === 'file');
+      const total = files.length;
+
+      if (total === 0) {
+        Logger.warn(`远程目录中没有文件: ${targetRemoteDir}`);
+        fs.mkdirSync(localDir, { recursive: true });
+        return { success: true, downloaded: 0, total: 0, errors: [] };
+      }
+
+      fs.mkdirSync(localDir, { recursive: true });
+
+      let downloaded = 0;
+      const errors: string[] = [];
+      const baseForRelative = targetRemoteDir === '' ? '/' : targetRemoteDir;
+
+      for (let i = 0; i < files.length; i++) {
+        const item = files[i];
+        const remoteFilePath = this.normalizeRemotePath(item.filename);
+        const relativePosix = path.posix.relative(
+          baseForRelative === '' ? '/' : baseForRelative,
+          remoteFilePath
+        );
+        const relativeSegments = relativePosix
+          .split('/')
+          .filter(segment => segment && segment !== '.');
+        const localFilePath = path.join(localDir, ...relativeSegments);
+
+        if (onProgress) {
+          onProgress(i + 1, total, item.basename);
+        }
+
+        const success = await this.downloadFile(remoteFilePath, localFilePath, overwriteExisting);
+
+        if (success) {
+          downloaded += 1;
+        } else {
+          errors.push(remoteFilePath);
+        }
+      }
+
+      const success = errors.length === 0;
+      if (success) {
+        Logger.success(`目录下载完成: ${downloaded}/${total}`);
+      } else {
+        Logger.warn(`目录下载完成但存在失败: ${downloaded}/${total}`);
+      }
+
+      return { success, downloaded, total, errors };
+    } catch (error) {
+      Logger.error(`下载目录失败: ${remoteDir}`, error as Error);
+      return { success: false, downloaded: 0, total: 0, errors: [(error as Error).message] };
     }
   }
 

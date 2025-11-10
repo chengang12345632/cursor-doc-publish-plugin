@@ -2,7 +2,7 @@
   "name": "cursor-doc-publish-plugin",
   "displayName": "NextCloud Doc Publisher",
   "description": "一键发布 Markdown 文档到 NextCloud，自动上传资源文件，支持单文档和批量发布",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "publisher": "shon-chen",
   "engines": {
     "vscode": "^1.80.0"
@@ -44,6 +44,10 @@
       {
         "command": "docPublish.showConfiguration",
         "title": "NextCloud Doc Publisher: Show Configuration"
+      },
+      {
+        "command": "docPublish.downloadFromNextcloud",
+        "title": "Download From NextCloud To Local"
       }
     ],
     "keybindings": [
@@ -67,9 +71,24 @@
           "group": "navigation"
         },
         {
+          "command": "docPublish.publishCurrent",
+          "when": "resourceExtname == .xlsx",
+          "group": "navigation"
+        },
+        {
           "command": "docPublish.publishDirectory",
           "when": "explorerResourceIsFolder",
           "group": "navigation"
+        },
+        {
+          "command": "docPublish.downloadFromNextcloud",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation@2"
+        },
+        {
+          "command": "docPublish.downloadFromNextcloud",
+          "when": "explorerResourceIsFolder == false",
+          "group": "navigation@2"
         }
       ]
     },

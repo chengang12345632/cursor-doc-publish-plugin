@@ -4,9 +4,10 @@ import * as fs from 'fs';
 import { ConfigService } from '../services/config';
 import { NextCloudService } from '../services/nextcloud';
 import { MarkdownService } from '../services/markdown';
-import { PublishResult, DocPublishConfig } from '../types';
+import { PublishResult, DocPublishConfig, AssetInfo } from '../types';
 import { Logger } from '../utils/logger';
 import { showDirectorySelector } from '../utils/directorySelector';
+import { getRemotePathSuggestion } from '../utils/pathHelper';
 
 /**
  * 发布当前文档命令
@@ -21,34 +22,38 @@ export async function publishCurrent(
     Logger.show(); // 自动显示输出面板，方便用户查看日志
 
     // 1. 获取当前文档路径
-    let markdownPath: string;
+    let documentPath: string;
     
     if (uri) {
       // 从右键菜单调用
-      markdownPath = uri.fsPath;
+      documentPath = uri.fsPath;
       Logger.info(`触发方式: 右键菜单`);
     } else {
       // 从命令面板或快捷键调用
       Logger.info(`触发方式: 命令面板/快捷键`);
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
-        const msg = '请先打开一个 Markdown 文档';
+        const msg = '请先打开一个支持的文件（Markdown 或 Excel）';
         Logger.error(msg);
         vscode.window.showErrorMessage(msg);
         return;
       }
-      markdownPath = editor.document.uri.fsPath;
+      documentPath = editor.document.uri.fsPath;
     }
 
-    // 验证是否为 Markdown 文件
-    if (!markdownPath.endsWith('.md')) {
-      const msg = '当前文件不是 Markdown 文档';
+    const fileExt = path.extname(documentPath).toLowerCase();
+    const supportedExtensions = ['.md', '.xlsx'];
+
+    if (!supportedExtensions.includes(fileExt)) {
+      const msg = '当前文件类型不受支持，只支持 Markdown (.md) 或 Excel (.xlsx) 文件';
       Logger.error(msg);
       vscode.window.showErrorMessage(msg);
       return;
     }
 
-    Logger.info(`文档路径: ${markdownPath}`);
+    const isMarkdown = fileExt === '.md';
+    Logger.info(`文档路径: ${documentPath}`);
+    Logger.info(`文档类型: ${isMarkdown ? 'Markdown' : 'Excel'}`);
 
     // 2. 读取配置
     const config = await ConfigService.getConfig();
@@ -71,15 +76,26 @@ export async function publishCurrent(
       return;
     }
 
-    // 3. 获取上传目录
+    // 3. 获取工作区根路径
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      vscode.window.showErrorMessage('请先打开一个工作区');
+      return;
+    }
+    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+    // 4. 获取上传目录
     if (!context) {
       vscode.window.showErrorMessage('插件上下文未提供，无法选择上传目录');
       return;
     }
 
+    const defaultRemoteDir = getRemotePathSuggestion(workspaceRoot, path.dirname(documentPath));
+
     const uploadDirectory = await showDirectorySelector(
       context,
-      '输入或选择上传目录（例如：/Docs/V2.16.13/design）'
+      '输入或选择上传目录（例如：/Docs/V2.16.13/design）',
+      defaultRemoteDir
     );
 
     if (!uploadDirectory) {
@@ -88,14 +104,6 @@ export async function publishCurrent(
     }
 
     Logger.info(`选择的上传目录: ${uploadDirectory}`);
-
-    // 4. 获取工作区根路径
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-      vscode.window.showErrorMessage('请先打开一个工作区');
-      return;
-    }
-    const workspaceRoot = workspaceFolders[0].uri.fsPath;
 
     // 5. 执行发布
     const result = await vscode.window.withProgress(
@@ -106,7 +114,7 @@ export async function publishCurrent(
       },
       async (progress) => {
         return await publishDocument(
-          markdownPath,
+          documentPath,
           workspaceRoot,
           uploadDirectory,
           config,
@@ -117,18 +125,21 @@ export async function publishCurrent(
 
     // 5. 显示结果
     if (result.success) {
-      Logger.success(`文档发布成功: ${path.basename(markdownPath)}`);
+      Logger.success(`文档发布成功: ${path.basename(documentPath)}`);
       
       const message = [
         `✓ 文档发布成功！`,
-        `📄 ${path.basename(markdownPath)}`,
+        `📄 ${path.basename(documentPath)}`,
         result.assetsUploaded ? `📎 资源文件: ${result.assetsUploaded}` : ''
       ].filter(Boolean).join('\n');
 
-      const buttons = ['查看日志'];
-      if (result.docUrl) {
-        buttons.push('打开文档');
-      }
+    const buttons = ['查看日志'];
+    if (result.directoryUrl) {
+      buttons.push('打开目录');
+    }
+    if (result.docUrl) {
+      buttons.push('打开文档');
+    }
       
       const action = await vscode.window.showInformationMessage(
         message,
@@ -137,6 +148,8 @@ export async function publishCurrent(
 
       if (action === '查看日志') {
         Logger.show();
+      } else if (action === '打开目录' && result.directoryUrl) {
+        vscode.env.openExternal(vscode.Uri.parse(result.directoryUrl));
       } else if (action === '打开文档' && result.docUrl) {
         vscode.env.openExternal(vscode.Uri.parse(result.docUrl));
       }
@@ -164,7 +177,7 @@ export async function publishCurrent(
  * 发布单个文档的核心逻辑
  */
 async function publishDocument(
-  markdownPath: string,
+  filePath: string,
   workspaceRoot: string,
   uploadDirectory: string,
   config: DocPublishConfig,
@@ -177,13 +190,22 @@ async function publishDocument(
     Logger.publishing('初始化 NextCloud 客户端');
 
     // 2. 获取文件名
-    const fileName = path.basename(markdownPath);
+    const fileName = path.basename(filePath);
+    const fileExt = path.extname(fileName).toLowerCase();
+    const isMarkdown = fileExt === '.md';
+
     Logger.info(`文档文件名: ${fileName}`);
 
-    // 3. 扫描文档中引用的资源
-    progress.report({ message: '扫描文档中引用的资源...' });
-    Logger.publishing('扫描文档中引用的资源文件');
-    const assets = MarkdownService.scanAssetReferences(markdownPath);
+    // 3. 扫描文档中引用的资源（仅 Markdown 支持）
+    let assets: AssetInfo[] = [];
+
+    if (isMarkdown) {
+      progress.report({ message: '扫描文档中引用的资源...' });
+      Logger.publishing('扫描文档中引用的资源文件');
+      assets = MarkdownService.scanAssetReferences(filePath);
+    } else {
+      Logger.info('当前文件类型不支持资源引用扫描，跳过资源收集');
+    }
 
     // 4. 上传资源并获取分享链接
     let linkMap = new Map<string, string>();
@@ -216,12 +238,16 @@ async function publishDocument(
 
       Logger.success(`资源上传完成: ${linkMap.size}/${assets.length}`);
     } else {
-      Logger.info('同级目录下没有资源文件，跳过资源上传');
+      if (isMarkdown) {
+        Logger.info('文档未引用任何资源文件，跳过资源上传');
+      } else {
+        Logger.info('当前文件类型无需上传额外资源，跳过资源上传');
+      }
     }
 
-    // 5. 上传 Markdown 文档（直接上传原始文件）
-    progress.report({ message: '上传 Markdown 文档...' });
-    Logger.publishing('上传 Markdown 文档到 NextCloud');
+    // 5. 上传文件（直接上传原始文件）
+    progress.report({ message: '上传文件...' });
+    Logger.publishing('上传文件到 NextCloud');
 
     // 标准化上传目录
     const normalizedDir = uploadDirectory.trim().replace(/\/$/, ''); // 去除末尾斜杠
@@ -229,24 +255,26 @@ async function publishDocument(
     const remotePath = `${baseDir}/${fileName}`.replace(/\\/g, '/');
 
     // 直接上传原始文档（默认覆盖）
-    const uploadSuccess = await nextCloudService.uploadFile(markdownPath, remotePath, true);
+    const uploadSuccess = await nextCloudService.uploadFile(filePath, remotePath, true);
 
     if (!uploadSuccess) {
       return {
         success: false,
-        message: 'Markdown 文档上传失败'
+        message: '文件上传失败'
       };
     }
 
     // 获取文档分享链接
-    const docShareLink = await nextCloudService.createShareLink(remotePath);
+    const docShareLink = await nextCloudService.getOrCreateShareLink(remotePath);
+    const directoryShareLink = await nextCloudService.getOrCreateShareLink(baseDir);
 
-    Logger.success('Markdown 文档上传成功');
+    Logger.success('文件上传成功');
 
     return {
       success: true,
       message: '文档发布成功',
       docUrl: docShareLink || undefined,
+      directoryUrl: directoryShareLink || undefined,
       assetsUploaded: linkMap.size
     };
   } catch (error) {

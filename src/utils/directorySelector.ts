@@ -19,7 +19,8 @@ interface HistoryItem extends vscode.QuickPickItem {
  */
 export async function showDirectorySelector(
   context: vscode.ExtensionContext,
-  placeholder: string = '输入或选择上传目录'
+  placeholder: string = '输入或选择上传目录',
+  defaultValue?: string
 ): Promise<string | undefined> {
   Logger.debug('开始显示目录选择器');
   const history = await DirectoryHistoryService.getHistory(context);
@@ -33,6 +34,10 @@ export async function showDirectorySelector(
   quickPick.canSelectMany = false;
   quickPick.matchOnDescription = true;
   quickPick.ignoreFocusOut = false; // 允许点击外部时保持打开
+
+  if (defaultValue) {
+    quickPick.value = defaultValue;
+  }
 
   // 构建选项列表
   const items: HistoryItem[] = [];
