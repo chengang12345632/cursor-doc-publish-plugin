@@ -2,7 +2,7 @@
   "name": "cursor-doc-publish-plugin",
   "displayName": "NextCloud Doc Publisher",
   "description": "一键发布 Markdown 文档到 NextCloud，自动上传资源文件，支持单文档和批量发布",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "publisher": "shon-chen",
   "engines": {
     "vscode": "^1.80.0"

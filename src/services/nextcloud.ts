@@ -326,8 +326,8 @@ export class NextCloudService {
       }
 
       if (!overwriteExisting && fs.existsSync(localPath)) {
-        Logger.info(`本地文件已存在且未开启覆盖，跳过下载: ${localPath}`);
-        return false;
+        Logger.info(`Local file already exists, skipping download: ${localPath}`);
+        return true; // Return true to indicate successful skip (not an error)
       }
 
       const rawData = await this.webdavClient.getFileContents(normalizedRemotePath, {
@@ -385,6 +385,7 @@ export class NextCloudService {
       fs.mkdirSync(localDir, { recursive: true });
 
       let downloaded = 0;
+      let skipped = 0;
       const errors: string[] = [];
       const baseForRelative = targetRemoteDir === '' ? '/' : targetRemoteDir;
 
@@ -404,10 +405,16 @@ export class NextCloudService {
           onProgress(i + 1, total, item.basename);
         }
 
+        const fileExistedBefore = fs.existsSync(localFilePath);
         const success = await this.downloadFile(remoteFilePath, localFilePath, overwriteExisting);
 
         if (success) {
-          downloaded += 1;
+          // Check if file was actually downloaded or skipped
+          if (!overwriteExisting && fileExistedBefore) {
+            skipped += 1;
+          } else {
+            downloaded += 1;
+          }
         } else {
           errors.push(remoteFilePath);
         }
@@ -415,9 +422,13 @@ export class NextCloudService {
 
       const success = errors.length === 0;
       if (success) {
-        Logger.success(`目录下载完成: ${downloaded}/${total}`);
+        if (skipped > 0) {
+          Logger.success(`Directory download completed: ${downloaded} downloaded, ${skipped} skipped out of ${total} files`);
+        } else {
+          Logger.success(`Directory download completed: ${downloaded}/${total} files`);
+        }
       } else {
-        Logger.warn(`目录下载完成但存在失败: ${downloaded}/${total}`);
+        Logger.warn(`Directory download completed with errors: ${downloaded} downloaded, ${skipped} skipped, ${errors.length} failed out of ${total} files`);
       }
 
       return { success, downloaded, total, errors };

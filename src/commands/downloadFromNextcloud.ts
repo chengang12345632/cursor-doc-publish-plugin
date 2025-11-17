@@ -108,23 +108,42 @@ export async function downloadFromNextcloud(
 
     let overwriteExisting = true;
     if (exists) {
-      const promptMessage = isDirectory
-        ? `本地目录已存在：${targetPath}\n覆盖将会替换同名文件，是否继续？`
-        : `本地文件已存在：${targetPath}\n是否覆盖？`;
+      if (isDirectory) {
+        // Directory download: show Overwrite, Skip
+        // Cancel is handled automatically by VS Code (X button or ESC key)
+        const promptMessage = `Local directory already exists: ${targetPath}\nOverwrite will replace existing files, Skip will only download missing files.`;
+        
+        const choice = await vscode.window.showWarningMessage(
+          promptMessage,
+          { modal: true },
+          'Overwrite',
+          'Skip'
+        );
 
-      const choice = await vscode.window.showWarningMessage(
-        promptMessage,
-        { modal: true },
-        '覆盖',
-        '取消'
-      );
+        if (!choice) {
+          Logger.info('User cancelled download operation');
+          return;
+        }
 
-      if (choice !== '覆盖') {
-        Logger.info('用户取消了下载操作');
-        return;
+        overwriteExisting = choice === 'Overwrite';
+      } else {
+        // File download: show Overwrite only
+        // Cancel is handled automatically by VS Code (X button or ESC key)
+        const promptMessage = `Local file already exists: ${targetPath}\nDo you want to overwrite it?`;
+        
+        const choice = await vscode.window.showWarningMessage(
+          promptMessage,
+          { modal: true },
+          'Overwrite'
+        );
+
+        if (choice !== 'Overwrite') {
+          Logger.info('User cancelled download operation');
+          return;
+        }
+
+        overwriteExisting = true;
       }
-
-      overwriteExisting = true;
     }
 
     if (!exists && isDirectory) {
